@@ -26,7 +26,7 @@
   .chip.yr.on{background:#2a2a2a;border-color:var(--gold);color:var(--gold)}
   .lbl{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:#5a5a5a;margin:8px 2px 3px;font-weight:700}
   .tabs{display:flex;gap:0;margin-top:8px;border-top:1px solid var(--bord)}
-  .tab{flex:1;text-align:center;padding:11px 4px;font-size:12.5px;font-weight:700;color:var(--mut);border-bottom:2px solid transparent;cursor:pointer;letter-spacing:.3px}
+  .tab{flex:1;text-align:center;padding:10px 2px;font-size:11px;font-weight:700;color:var(--mut);border-bottom:2px solid transparent;cursor:pointer;letter-spacing:.2px;white-space:nowrap}
   .tab.on{color:var(--gold);border-bottom-color:var(--gold)}
   .bc{display:flex;align-items:center;gap:6px;padding:9px 12px 3px;font-size:13px;color:var(--mut);flex-wrap:wrap}
   .bc .b{color:var(--gold);font-weight:600}.bc .sep{color:#444}
@@ -72,6 +72,7 @@
   </div>
   <div class="tabs" id="tabs">
     <div class="tab" data-t="vg"  onclick="pickTab('vg')">Visión</div>
+    <div class="tab" data-t="gen" onclick="pickTab('gen')">Género</div>
     <div class="tab" data-t="fam" onclick="pickTab('fam')">Familias</div>
     <div class="tab" data-t="stk" onclick="pickTab('stk')">Stock</div>
     <div class="tab" data-t="tc"  onclick="pickTab('tc')">Tallas/Col</div>
@@ -135,10 +136,49 @@ function aggStock(groupFn,famFilter){
 function render(){
   renderStoreChips();renderDepChips();renderYearChips();renderMonthChips();renderTabs();
   document.getElementById('periodWrap').style.display = (S.tab==='stk')?'none':'block';
+  // el filtro de género se oculta en la pestaña Género (compara todos los géneros)
+  const genTab = S.tab==='gen';
+  document.getElementById('depChips').style.display = genTab?'none':'flex';
+  document.getElementById('depLbl').style.display = (!genTab && DATA[S.store].deps.length>1)?'block':'none';
   if(S.tab==='vg') renderVG();
+  else if(S.tab==='gen') renderGen();
   else if(S.tab==='fam') renderFam();
   else if(S.tab==='stk') renderStk();
   else renderTC();
+}
+
+/* ============ TAB GÉNERO / LÍNEA ============ */
+function renderGen(){
+  const st=DATA[S.store], ys=S.years, ms=S.months;
+  const byDep={};
+  for(const fam in st.drill){ const o=st.drill[fam],deps=o.d;
+    for(const r of o.r){ if(!ys.has(r[Y]))continue; if(ms.size&&!ms.has(r[M]))continue;
+      const dn=deps[r[DPI]]; const g=byDep[dn]||(byDep[dn]={u:0,imp:0,dcto:0,cost:0});
+      g.u+=r[U]; g.imp+=r[IMP]; g.dcto+=r[DCTO]; g.cost+=r[COST]; } }
+  // sell-through por dep (stock, foto)
+  const stk=st.dstk||{}, stByDep={};
+  for(const dep in stk){ let rec=0,v=0; for(const fam in stk[dep]) for(const row of stk[dep][fam]){ rec+=row[dREC]; v+=row[dV]; } stByDep[dep]=[rec,v]; }
+  let arr=Object.entries(byDep).map(([dep,g])=>({dep,...metrics(g)})).sort((a,b)=>b.imp-a.imp);
+  if(!arr.length){ setTot(''); setC('<div class="empty">Sin datos para el período</div>'); document.getElementById('bc').innerHTML=''; return; }
+  const tU=arr.reduce((s,x)=>s+x.u,0), tI=arr.reduce((s,x)=>s+x.imp,0);
+  const isMarca = DATA[S.store].name==='Kids';
+  setTot(`${DATA[S.store].name} · comparativo por ${isMarca?'marca/línea':'género'} · ${fmt(tU)} u · ${cur} ${fmt(tI)}`);
+  const mx=Math.max(1,...arr.map(x=>x.imp));
+  setC('<div class="list">'+arr.map(x=>{
+    const sd=stByDep[x.dep]; const stv=(sd&&sd[0])?sd[1]/sd[0]*100:null;
+    const mixU=tU?x.u/tU*100:0, mixI=tI?x.imp/tI*100:0;
+    return `<div class="row" style="cursor:default">
+      <div class="top"><div class="nm">${depLabel(x.dep)}</div><div class="u">${cur} ${fmt(x.imp)}<small> · ${mixI.toFixed(0)}%</small></div></div>
+      <div class="met">
+        <span>u <b>${fmt(x.u)}</b> (${mixU.toFixed(0)}%)</span>
+        <span>px <b>${fmt(x.px)}</b></span>
+        <span>mg <b class="${mgCol(x.mg)}">${x.mg.toFixed(0)}%</b> · ${cur} ${fmt(x.mgBs)}</span>
+        <span>dcto <b class="${dcCol(x.dc)}">${x.dc.toFixed(0)}%</b></span>
+        ${stv!=null?`<span>ST <b class="${stCol(stv)}">${stv.toFixed(0)}%</b></span>`:''}
+      </div>
+      <div class="mixbar"><i style="width:${(x.imp/mx*100).toFixed(1)}%"></i></div>
+    </div>`;}).join('')+'</div>');
+  document.getElementById('bc').innerHTML='';
 }
 
 /* ============ TAB VISIÓN GENERAL ============ */
@@ -177,7 +217,12 @@ function renderVG(){
 }
 function renderTabs(){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===S.tab));}
 function renderStoreChips(){document.getElementById('storeChips').innerHTML=ORDER.map(c=>`<div class="chip ${c===S.store?'on':''}" onclick="pickStore('${c}')">${DATA[c].name}</div>`).join('');}
-function depLabel(d){return /WOMAN|MUJER/i.test(d)?'Mujer':/\bMAN\b|MEN|HOMBRE/i.test(d)?'Hombre':d;}
+function depLabel(d){
+  const u=(d||'').toUpperCase();
+  if(u==='SHE'||u==='SHE LP')return'Mujer'; if(u==='HE'||u==='HE LP')return'Hombre';
+  if(u==='NIÑA'||u==='NINA')return'Niña'; if(u==='NIÑO'||u==='NINO')return'Niño';
+  return /WOMAN|MUJER/i.test(d)?'Mujer':/\bMAN\b|MEN|HOMBRE/i.test(d)?'Hombre':d;
+}
 function renderDepChips(){const deps=DATA[S.store].deps,w=document.getElementById('depChips'),l=document.getElementById('depLbl');
   if(deps.length<=1){w.innerHTML='';l.style.display='none';return;} l.style.display='block';
   w.innerHTML=`<div class="chip dep ${S.deps.size===0?'on':''}" onclick="pickDep(null)">Todos</div>`+
