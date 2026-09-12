@@ -286,8 +286,10 @@ function renderInformes(rootId){
     <iframe id="infFrame" style="width:100%;height:${hh}px;border:0;background:#fff;border-radius:10px;margin-top:6px"></iframe></div>`;
   document.getElementById('infFrame').srcdoc=L.find(x=>x.k===INF_SEL).html;
 }
-function pickInforme(k){INF_SEL=k;renderInformes('grpRoot');}
-return {render,renderStocks,renderRend,renderInformes,pickInforme};})();
+function pickInforme(k){if(k===INF_SEL)return;INF_SEL=k;if(typeof nav==='function')nav();renderInformes('grpRoot');}
+return {render,renderStocks,renderRend,renderInformes,pickInforme,getInf:()=>INF_SEL,setInf:k=>{INF_SEL=k;}};})();
+function INF_SEL_GET(){return GRP.getInf();}
+function INF_SEL_SET(k){GRP.setInf(k);}
 function renderStocks(){GRP.renderStocks('grpRoot');}
 function renderRend(){GRP.renderRend('grpRoot');}
 function renderInformes(){GRP.renderInformes('grpRoot');}
@@ -553,16 +555,26 @@ function setC(html){document.getElementById('content').innerHTML=html;}
 function setTot(html){document.getElementById('tot').innerHTML=html;}
 
 /* ---- navegación ---- */
-function pickStore(c){if(c===S.store)return;S.store=c;S.deps.clear();S.famPath=[];S.stkPath=[];S.tcFam=null;render();toTop();}
-function pickDep(d){if(d===null)S.deps.clear();else S.deps.has(d)?S.deps.delete(d):S.deps.add(d);S.famPath=[];S.stkPath=[];render();}
-function pickTab(t){S.tab=t;render();toTop();}
-function toggleYear(y){if(S.years.has(y)){if(S.years.size>1)S.years.delete(y);}else S.years.add(y);render();}
-function toggleMonth(m){S.months.has(m)?S.months.delete(m):S.months.add(m);render();}
-function allMonths(){S.months.clear();render();}
-function famDown(v){S.famPath.push(v);render();toTop();}
-function famUp(i){S.famPath=S.famPath.slice(0,i);render();toTop();}
-function stkDown(v){S.stkPath.push(v);render();toTop();}
-function stkUp(i){S.stkPath=S.stkPath.slice(0,i);render();toTop();}
+// ── Botón «atrás» del celular (Pepe, 12-sep-2026): cada navegación deja una entrada en el historial del
+// navegador; al retroceder se restaura el estado anterior en vez de salir de la app. La primera entrada
+// es la pantalla inicial; sólo un «atrás» más desde ahí cierra la app (comportamiento normal de Android).
+function snap(){return {store:S.store,deps:[...S.deps],years:[...S.years],months:[...S.months],tab:S.tab,famPath:[...S.famPath],stkPath:[...S.stkPath],tcFam:S.tcFam,inf:(typeof INF_SEL_GET==='function')?INF_SEL_GET():null};}
+function restore(o){S.store=o.store;S.deps=new Set(o.deps);S.years=new Set(o.years);S.months=new Set(o.months);S.tab=o.tab;S.famPath=[...o.famPath];S.stkPath=[...o.stkPath];S.tcFam=o.tcFam;
+  if(o.inf&&typeof INF_SEL_SET==='function')INF_SEL_SET(o.inf);}
+let NAV_LOCK=false;
+function nav(){if(NAV_LOCK)return;try{history.pushState(snap(),'');}catch(e){}}
+window.addEventListener('popstate',e=>{if(e.state){NAV_LOCK=true;restore(e.state);render();toTop();NAV_LOCK=false;}});
+try{history.replaceState(snap(),'');}catch(e){}
+function pickStore(c){if(c===S.store)return;S.store=c;S.deps.clear();S.famPath=[];S.stkPath=[];S.tcFam=null;nav();render();toTop();}
+function pickDep(d){if(d===null)S.deps.clear();else S.deps.has(d)?S.deps.delete(d):S.deps.add(d);S.famPath=[];S.stkPath=[];nav();render();}
+function pickTab(t){if(t===S.tab)return;S.tab=t;nav();render();toTop();}
+function toggleYear(y){if(S.years.has(y)){if(S.years.size>1)S.years.delete(y);}else S.years.add(y);nav();render();}
+function toggleMonth(m){S.months.has(m)?S.months.delete(m):S.months.add(m);nav();render();}
+function allMonths(){S.months.clear();nav();render();}
+function famDown(v){S.famPath.push(v);nav();render();toTop();}
+function famUp(i){S.famPath=S.famPath.slice(0,i);nav();render();toTop();}
+function stkDown(v){S.stkPath.push(v);nav();render();toTop();}
+function stkUp(i){S.stkPath=S.stkPath.slice(0,i);nav();render();toTop();}
 function toTop(){window.scrollTo(0,0);}
 
 render();
