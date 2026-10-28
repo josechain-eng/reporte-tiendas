@@ -143,6 +143,15 @@
   .hoy .btn{background:var(--gold);color:#111;border:0;border-radius:9px;padding:9px 14px;font-weight:700;font-size:14px;cursor:pointer}
   .hoy .btn2{background:var(--card2);color:var(--txt);border:1px solid var(--bord);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:600;cursor:pointer}
   .hoy .nota{font-size:11px;color:#777;margin-top:6px}
+  .hoy .mini{display:none;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:10px;padding-top:9px;border-top:1px solid #4a3f1c;font-size:10.5px;color:var(--mut)}
+  .hoy .mini b{display:block;color:var(--txt);font-size:15px}
+  .hoy .tc .chev{float:right;color:#555;font-size:11px;margin-top:4px}
+  @media (max-width:899px){
+    .hoy .gk .kpi.osc{grid-column:1 / -1}.hoy .gk .kpi.osc .v{font-size:26px}.hoy .mini{display:grid}
+    .hoy .gk .solo-mac{display:none}
+    .hoy .tc:not(.ab) .mets{display:none}.hoy .tc{padding:10px 12px}
+    .hoy .dos>div:last-child{order:-1}.hoy .dos{display:flex;flex-direction:column}
+  }
   @media (min-width:900px){
     .hoy .gk{grid-template-columns:repeat(4,minmax(0,1fr))}
     .hoy .ts{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -431,14 +440,15 @@ function renderHoy(){
   const ayG=ORD.reduce((s,t)=>s+T[t].ayer.imp,0), ayL=ORD.reduce((s,t)=>s+T[t].ayer_ly.imp,0), hoyG=ORD.reduce((s,t)=>s+T[t].hoy.imp,0);
   const pv=hPct(G.a.imp,G.b.imp), pa=hPct(ayG,ayL), opA=G.a.opN?100*G.a.opB/G.a.opN:null, opL=G.b.opN?100*G.b.opB/G.b.opN:null, pop=hPP(opA,opL);
   const ly=new Date(D.ayer_ly+'T12:00:00');
-  const kp=(l,v,s1,c1,s2,c2,osc)=>`<div class="kpi ${osc?'osc':''}"><div class="k">${l}</div><div class="v">${v}</div><div class="s"><span class="${c1||''}">${s1}</span>${s2?`<br><span class="${c2||''}">${s2}</span>`:''}</div></div>`;
+  const kp=(l,v,s1,c1,s2,c2,osc,cls,extra)=>`<div class="kpi ${osc?'osc':''} ${cls||''}"><div class="k">${l}</div><div class="v">${v}</div><div class="s"><span class="${c1||''}">${s1}</span>${s2?`<br><span class="${c2||''}">${s2}</span>`:''}</div>${extra||''}</div>`;
+  const mini=`<div class="mini"><span>Facturas<b>${fmt(G.a.fac)}</b></span><span>UPT<b>${hDec(G.a.fac?G.a.u/G.a.fac:null,2)}</b></span><span>Ticket<b>${hBs(G.a.fac?G.a.imp/G.a.fac:null)}</b></span></div>`;
   h+=`<div class="sec">Grupo · ${per}</div><div class="gk">`+
-    kp('Venta',hBs(HS.modo==='ayer'?ayG:G.a.imp),(HS.modo==='ayer'?pa:pv).t+' vs 2025',(HS.modo==='ayer'?pa:pv).c,gp?gp.t+' vs proyección':'',gp?gp.c:'',true)+
+    kp('Venta',hBs(HS.modo==='ayer'?ayG:G.a.imp),(HS.modo==='ayer'?pa:pv).t+' vs 2025',(HS.modo==='ayer'?pa:pv).c,gp?gp.t+' vs proyección':'',gp?gp.c:'',true,'',mini)+
     kp('Ayer',hBs(ayG),pa.t+' vs '+HDIA[ly.getDay()]+' '+ly.getDate()+'/'+(ly.getMonth()+1)+'/'+String(ly.getFullYear()).slice(2),pa.c,'hoy hasta ahora: '+hBs(hoyG),'')+
     kp('Margen operativo',opA==null?'—':hDec(opA,1)+' %',pop.t?pop.t+' vs 2025':'',pop.c,esAct?'mes en curso: estimado':'','')+
-    kp('Facturas',fmt(G.a.fac),hPct(G.a.fac,G.b.fac).t+' vs 2025',hPct(G.a.fac,G.b.fac).c,fmt(G.a.u)+' unidades','')+
-    kp('Unidades por factura',hDec(G.a.fac?G.a.u/G.a.fac:null,2),hDec(G.b.fac?G.b.u/G.b.fac:null,2)+' en 2025','')+
-    kp('Ticket promedio',hBs(G.a.fac?G.a.imp/G.a.fac:null),hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).t+' vs 2025',hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).c)+
+    kp('Facturas',fmt(G.a.fac),hPct(G.a.fac,G.b.fac).t+' vs 2025',hPct(G.a.fac,G.b.fac).c,fmt(G.a.u)+' unidades','',false,'solo-mac')+
+    kp('Unidades por factura',hDec(G.a.fac?G.a.u/G.a.fac:null,2),hDec(G.b.fac?G.b.u/G.b.fac:null,2)+' en 2025','','','',false,'solo-mac')+
+    kp('Ticket promedio',hBs(G.a.fac?G.a.imp/G.a.fac:null),hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).t+' vs 2025',hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).c,'','',false,'solo-mac')+
     kp('Precio promedio',hBs(G.a.u?G.a.imp/G.a.u:null),hBs(G.b.u?G.b.imp/G.b.u:null)+' en 2025','')+
     kp('Descuento',hDec(G.a.monto?100*(1-G.a.imp/G.a.monto):null,1)+' %',hDec(G.b.monto?100*(1-G.b.imp/G.b.monto):null,1)+' % en 2025','')+`</div>`;
   // tiendas
@@ -449,9 +459,9 @@ function renderHoy(){
     else{v=a.imp;c1=hPct(a.imp,b.imp);c2=X.proy?{t:Math.round(100*a.imp/X.proy.anual)+' % de la proy. anual',c:''}:{t:'',c:''};av=X.proy?a.imp/X.proy.anual:0;}
     const M=X.meses[HS.modo==='mes'?HS.mes:act]||{}, aM=hAgg(X,[HS.modo==='mes'?HS.mes:act],'a'), bM=hAgg(X,[HS.modo==='mes'?HS.mes:act],'b'), ab=HS.abierta===t;
     const pop=hPP(a.op,b.op);
-    h+=`<div class="tc" onclick="hoyAbrir('${esc(t)}')"><div class="top"><span class="nm">${X.nom}</span><span class="v">${hBs(v)}</span></div>
+    h+=`<div class="tc${ab?' ab':''}" onclick="hoyAbrir('${esc(t)}')"><div class="top"><span class="nm">${X.nom}</span><span class="v">${hBs(v)}</span></div>
       <div class="cmp"><span class="${c1.c}">${c1.t} vs 2025</span><span class="${c2.c}">${c2.t}${HS.modo==='mes'&&c2.t?' vs proy.':''}</span></div>
-      ${av?`<div class="barp"><i style="width:${Math.min(100,Math.round(100*av))}%;background:${av>=1?'var(--green)':'var(--gold)'}"></i></div>`:''}
+      ${av?`<div class="barp"><i style="width:${Math.min(100,Math.round(100*av))}%;background:${av>=1?'var(--green)':'var(--gold)'}"></i></div>`:''}<span class="chev">${ab?'▲ cerrar':'▼ ver detalle'}</span>
       <div class="mets"><span>Margen op.<b>${a.op==null?'—':hDec(a.op,0)+' %'}</b><i class="${pop.c}" style="font-style:normal">${pop.t}</i></span><span>Facturas<b>${fmt(a.fac)}</b></span><span>UPT<b>${hDec(a.upt,2)}</b></span><span>Ticket<b>${hBs(a.tk)}</b></span>
       <span>Precio<b>${hBs(a.pp)}</b></span><span>Descuento<b>${hDec(a.ds,1)} %</b></span><span>Precio lleno<b>${a.ll==null?'—':Math.round(a.ll)+' %'}</b></span><span>Clientes nuevos<b>${HS.modo==='anio'||!M.cli?'—':M.cli.cn+' de '+M.cli.ci}</b></span></div>`;
     if(ab){h+=`<div class="det" onclick="event.stopPropagation()">`;
@@ -496,6 +506,7 @@ function renderHoy(){
     <div class="nota">Reponer = modelo-color con venta en 30 días y tallas con 0 o 1 en la tienda y stock en el depósito. Vigente que no salió a tienda = llegado desde 2022, en el depósito, sin stock en la tienda y sin ninguna venta desde 2024. 2022 vendido = en el mes, sobre lo que había (pasa a gasto en marzo 2027). Categorías al corte del libro (${D.libro_corte}).</div>
     <div style="margin-top:14px"><button class="btn2" onclick="hoySalir()">Cambiar la clave</button></div></div>`;
   r.innerHTML=h;
+  const on=r.querySelector('.chip.yr.on'); if(on&&on.parentNode)on.parentNode.scrollLeft=Math.max(0,on.offsetLeft-60);   // el mes elegido a la vista en el celular
 }
 
 </script>
