@@ -460,6 +460,9 @@ function hAgg(T,ks,lado){let imp=0,u=0,fac=0,monto=0,ull=0,opB=0,opN=0,opLyB=0,o
     if(lado==='a'&&M.op!=null){opB+=M.op*x.imp/100;opN+=x.imp;} if(lado==='b'&&M.op_ly!=null){opLyB+=M.op_ly*x.imp/100;opLyN+=x.imp;}});
   return {imp,u,fac,upt:fac?u/fac:null,tk:fac?imp/fac:null,pp:u?imp/u:null,ds:monto?100*(1-imp/monto):null,ll:u?100*ull/u:null,
           op:lado==='a'?(opN?100*opB/opN:null):(opLyN?100*opLyB/opLyN:null),opB:lado==='a'?opB:opLyB,opN:lado==='a'?opN:opLyN,monto};}
+// período de una tienda: con dia, ayer contra el mismo día de la semana de 2025; el margen operativo queda el del mes (no hay margen diario)
+function hPer(T,ks,lado,dia){if(!dia)return hAgg(T,ks,lado);const x=T[lado==='a'?'ayer':'ayer_ly']||{},m=hAgg(T,ks,lado),imp=x.imp||0,u=x.u||0,fac=x.fac||0,monto=x.monto||imp;
+  return {imp,u,fac,upt:fac?u/fac:null,tk:fac?imp/fac:null,pp:u?imp/u:null,ds:monto?100*(1-imp/monto):null,ll:u&&x.ll!=null?x.ll:null,op:m.op,opB:m.opB,opN:m.opN,monto};}
 function renderHoy(){
   const r=document.getElementById('grpRoot'); if(!r)return;
   const D=HS.datos, k=hLS('tablero_clave');
@@ -483,8 +486,9 @@ function renderHoy(){
   h+=`<div class="sub" style="margin-top:2px">${[['ayer','Ayer'],['mes','Mes'],['anio','Año a la fecha']].map(([m,l])=>`<span class="chip ${HS.modo===m?'on':''}" onclick="hoyModo('${m}')">${l}</span>`).join('')}</div>`;
   if(HS.modo==='mes')h+=`<div class="sub">${meses.map(m=>`<span class="chip yr ${HS.mes===m?'on':''}" onclick="hoyMes('${m}')">${HMES[Number(m.slice(5))-1].slice(0,3)}</span>`).join('')}</div>`;
   // grupo
-  const G={a:{imp:0,u:0,fac:0,monto:0,opB:0,opN:0},b:{imp:0,u:0,fac:0,monto:0,opB:0,opN:0}};
-  ORD.forEach(t=>['a','b'].forEach(l=>{const x=hAgg(T[t],ks,l);['imp','u','fac','monto','opB','opN'].forEach(q=>G[l][q]+=x[q]||0);}));
+  const dA=HS.modo==='ayer', gSum=dia=>{const G={a:{imp:0,u:0,fac:0,monto:0,opB:0,opN:0},b:{imp:0,u:0,fac:0,monto:0,opB:0,opN:0}};
+    ORD.forEach(t=>['a','b'].forEach(l=>{const x=hPer(T[t],ks,l,dia);['imp','u','fac','monto','opB','opN'].forEach(q=>G[l][q]+=x[q]||0);}));return G;};
+  const G=gSum(dA);
   const conP=ORD.filter(t=>T[t].proy), gp=esAct&&HS.modo==='mes'?hPct(conP.reduce((s,t)=>s+hAgg(T[t],ks,'a').imp,0),conP.reduce((s,t)=>s+T[t].proy.mtd,0)):null;
   const ayG=ORD.reduce((s,t)=>s+T[t].ayer.imp,0), ayL=ORD.reduce((s,t)=>s+T[t].ayer_ly.imp,0), hoyG=ORD.reduce((s,t)=>s+T[t].hoy.imp,0);
   const pv=hPct(G.a.imp,G.b.imp), pa=hPct(ayG,ayL), opA=G.a.opN?100*G.a.opB/G.a.opN:null, opL=G.b.opN?100*G.b.opB/G.b.opN:null, pop=hPP(opA,opL);
@@ -495,10 +499,10 @@ function renderHoy(){
   const kp=(id,l,v,s1,c1,s2,c2,osc,cls,extra)=>`<div class="kpi ${osc?'osc':''} ${cls||''} ${HS.kpi===id?'sel':''}" onclick="hoyKpi('${id}')"><span class="kchev">${HS.kpi===id?'▲':'▼'}</span><div class="k">${l}</div><div class="v">${v}</div><div class="s"><span class="${c1||''}">${s1}</span>${s2?`<br><span class="${c2||''}">${s2}</span>`:''}</div>${extra||''}</div>`;
   const mini=`<div class="mini"><span onclick="event.stopPropagation();hoyKpi('fac')">Facturas<b>${fmt(G.a.fac)}</b></span><span onclick="event.stopPropagation();hoyKpi('upt')">UPT<b>${hDec(G.a.fac?G.a.u/G.a.fac:null,2)}</b></span><span onclick="event.stopPropagation();hoyKpi('tk')">Ticket<b>${hBs(G.a.fac?G.a.imp/G.a.fac:null)}</b></span></div>`;
   h+=`<div class="sec">Grupo · ${per}</div><div class="gk">`+
-    kp('venta','Venta',hBs(HS.modo==='ayer'?ayG:G.a.imp),(HS.modo==='ayer'?pa:pv).t+' vs 2025',(HS.modo==='ayer'?pa:pv).c,gp?gp.t+' vs proyección':'',gp?gp.c:'',true,'',mini)+
+    kp('venta','Venta',hBs(G.a.imp),pv.t+' vs 2025',pv.c,gp?gp.t+' vs proyección':'',gp?gp.c:'',true,'',mini)+
     kp('ayer','Ayer',hBs(ayG),pa.t+' vs '+HDIA[ly.getDay()]+' '+ly.getDate()+'/'+(ly.getMonth()+1)+'/'+String(ly.getFullYear()).slice(2),pa.c,'hoy hasta ahora: '+hBs(hoyG),'')+
     kp('u','Unidades vendidas',fmt(G.a.u),hPct(G.a.u,G.b.u).t+' vs 2025',hPct(G.a.u,G.b.u).c,fmt(G.b.u)+' en 2025','')+
-    kp('op','Margen operativo',opA==null?'—':hDec(opA,1)+' %',pop.t?pop.t+' vs 2025':'',pop.c,esAct?'mes en curso: estimado':'','')+
+    kp('op','Margen operativo',opA==null?'—':hDec(opA,1)+' %',pop.t?pop.t+' vs 2025':'',pop.c,dA?'del mes en curso (estimado)':esAct?'mes en curso: estimado':'','')+
     kp('fac','Facturas',fmt(G.a.fac),hPct(G.a.fac,G.b.fac).t+' vs 2025',hPct(G.a.fac,G.b.fac).c,fmt(G.b.fac)+' en 2025','',false,'solo-mac')+
     kp('upt','Unidades por factura',hDec(G.a.fac?G.a.u/G.a.fac:null,2),hDec(G.b.fac?G.b.u/G.b.fac:null,2)+' en 2025','','','',false,'solo-mac')+
     kp('tk','Ticket promedio',hBs(G.a.fac?G.a.imp/G.a.fac:null),hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).t+' vs 2025',hPct(G.a.fac?G.a.imp/G.a.fac:null,G.b.fac?G.b.imp/G.b.fac:null).c,'','',false,'solo-mac')+
@@ -516,23 +520,22 @@ function renderHoy(){
       `<tr class="tot"><td>Grupo</td><td>${fmt(ST.tot)}</td><td>${fmt(ST.vig)}</td><td>${fmt(ST.obs)}</td><td>${fmt(ST.tra)}</td><td>100 %</td></tr></table></div>
       <div class="nota">Vigente = llegado desde 2022, más lo llegado después del libro${ST.sf?' ('+fmt(ST.sf)+' u)':''}. Incluye ${fmt(ST.s22)} u de 2022, que pasan a gasto en marzo 2027. Obsoleto = llegado antes de 2022. El año de llegada sale del libro Mov Estilo al ${D.libro_corte.split('-').reverse().join('-')}.
       En tránsito = lo que figura en aduana o en camino en ese mismo libro. Chilli no está en el libro: solo el total.</div></div>`;}
-  if(KD){const dia=HS.kpi==='ayer'||(HS.kpi==='venta'&&HS.modo==='ayer'), q=KD[1], suma=q==='imp'||q==='u'||q==='fac';
+  if(KD){const dia=HS.kpi==='ayer'||dA, q=KD[1], suma=q==='imp'||q==='u'||q==='fac';
     const der=x=>({imp:x.imp,u:x.u,fac:x.fac,upt:x.fac?x.u/x.fac:null,tk:x.fac?x.imp/x.fac:null,pp:x.u?x.imp/x.u:null,ds:x.monto?100*(1-x.imp/x.monto):null,op:x.op});
-    const sumo=L=>L.reduce((s,x)=>({imp:s.imp+(x.imp||0),u:s.u+(x.u||0),fac:s.fac+(x.fac||0),monto:s.monto+(x.monto||x.imp||0)}),{imp:0,u:0,fac:0,monto:0});
     const fv=v=>v==null||isNaN(v)?'—':KD[2]==='bs'?hBs(v):KD[2]==='n'?fmt(v):KD[2]==='d2'?hDec(v,2):hDec(v,1)+' %';
     const dv=(a,b)=>KD[2]==='pc'?hPP(a,b):hPct(a,b);
-    const GA=dia?der(sumo(ORD.map(t=>T[t].ayer))):der(Object.assign({},G.a,{op:opA})), GB=dia?der(sumo(ORD.map(t=>T[t].ayer_ly))):der(Object.assign({},G.b,{op:opL}));
-    const fil=ORD.map(t=>{const X=T[t];return [X.nom,(dia?der(X.ayer):der(hAgg(X,ks,'a')))[q],(dia?der(X.ayer_ly):der(hAgg(X,ks,'b')))[q]];});
+    const GG=dia===dA?G:gSum(dia), GA=der(Object.assign({},GG.a,{op:GG.a.opN?100*GG.a.opB/GG.a.opN:null})), GB=der(Object.assign({},GG.b,{op:GG.b.opN?100*GG.b.opB/GG.b.opN:null}));
+    const fil=ORD.map(t=>{const X=T[t];return [X.nom,der(hPer(X,ks,'a',dia))[q],der(hPer(X,ks,'b',dia))[q]];});
     h+=`<div class="kdet"><div class="tt"><span>${KD[0]} por tienda</span><span class="btn2" onclick="hoyKpi('${HS.kpi}')">✕</span></div>
       <div class="dato">${dia?'Ayer contra el '+HDIA[ly.getDay()]+' '+ly.getDate()+'/'+(ly.getMonth()+1)+'/'+String(ly.getFullYear()).slice(2):per[0].toUpperCase()+per.slice(1)+' 2026 contra el mismo período de 2025'}</div>
       <div class="tw"><table class="cols"><tr><th>Tienda</th><th>${dia?'Ayer':'2026'}</th><th>${dia?'Mismo día 2025':'2025'}</th><th>Var.</th>${suma?'<th>Peso</th>':''}</tr>`+
       fil.map(f=>{const x=dv(f[1],f[2]);return `<tr><td>${f[0]}</td><td>${fv(f[1])}</td><td>${fv(f[2])}</td><td class="${x.c}">${x.t||'—'}</td>${suma?`<td>${GA[q]?Math.round(100*(f[1]||0)/GA[q])+' %':'—'}</td>`:''}</tr>`;}).join('')+
       `<tr class="tot"><td>Grupo</td><td>${fv(GA[q])}</td><td>${fv(GB[q])}</td><td class="${dv(GA[q],GB[q]).c}">${dv(GA[q],GB[q]).t||'—'}</td>${suma?'<td>100 %</td>':''}</tr></table></div>
-      ${q==='op'?'<div class="nota">El margen del mes en curso es estimado. Chilli VM y VB tienen un solo P&L: muestran el mismo margen, y el del mes en curso no se estima.</div>':''}</div>`;}
+      ${q==='op'?'<div class="nota">'+(dia?'No hay margen por día: es el del mes en curso. ':'')+'El margen del mes en curso es estimado. Chilli VM y VB tienen un solo P&L: muestran el mismo margen, y el del mes en curso no se estima.</div>':''}</div>`;}
   // tiendas
-  h+=`<div class="sec">Tiendas · ${per}${HS.modo!=='ayer'?'':' (el resto, '+HMES[ay.getMonth()].toLowerCase()+')'}</div><div class="ts">`;
-  ORD.forEach(t=>{const X=T[t],a=hAgg(X,ks,'a'),b=hAgg(X,ks,'b'),S=X.stock;let v,c1,c2,av=0;
-    if(HS.modo==='ayer'){v=X.ayer.imp;c1=hPct(X.ayer.imp,X.ayer_ly.imp);c2={t:'',c:''};}
+  h+=`<div class="sec">Tiendas · ${per}${dA?' (margen y clientes, del mes)':''}</div><div class="ts">`;
+  ORD.forEach(t=>{const X=T[t],a=hPer(X,ks,'a',dA),b=hPer(X,ks,'b',dA),S=X.stock;let v,c1,c2,av=0;
+    if(dA){v=a.imp;c1=hPct(a.imp,b.imp);c2={t:'',c:''};}
     else if(HS.modo==='mes'){v=a.imp;c1=hPct(a.imp,b.imp);c2=(esAct&&X.proy)?hPct(a.imp,X.proy.mtd):{t:'',c:''};av=(esAct&&X.proy&&X.proy.mtd)?a.imp/X.proy.mtd:0;}
     else{v=a.imp;c1=hPct(a.imp,b.imp);c2=X.proy?{t:Math.round(100*a.imp/X.proy.anual)+' % de la proy. anual',c:''}:{t:'',c:''};av=X.proy?a.imp/X.proy.anual:0;}
     const M=X.meses[HS.modo==='mes'?HS.mes:act]||{}, aM=hAgg(X,[HS.modo==='mes'?HS.mes:act],'a'), bM=hAgg(X,[HS.modo==='mes'?HS.mes:act],'b'), ab=HS.abierta===t;
